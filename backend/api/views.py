@@ -2,47 +2,35 @@ import os
 from decouple import config
 import google.generativeai as genai
 from django.contrib.auth.models import User
-from django.conf import settings
 
-from rest_framework import viewsets, status, generics, views
+from rest_framework import viewsets, status, generics, views, serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .models import PortfolioImage
-from .serializers import PortfolioImageSerializer
 
 from .models import (
-    Skill, 
-    Resume, 
-    BusinessProfile, 
-    GovtProfile, 
-    JobPosting, 
-    SelfHelpGroup
+    Skill, Resume, BusinessProfile, GovtProfile, JobPosting,
+    SelfHelpGroup, PortfolioImage, Quiz, Question, Choice,
+    QuizAttempt, JobApplication
 )
 from .serializers import (
-    UserSerializer,
-    SkillSerializer, 
-    ResumeSerializer, 
-    BusinessProfileSerializer, 
-    GovtProfileSerializer,
-    JobPostingSerializer,
-    SelfHelpGroupSerializer,
-    MyTokenObtainPairSerializer
+    UserSerializer, SkillSerializer, ResumeSerializer,
+    BusinessProfileSerializer, GovtProfileSerializer,
+    JobPostingSerializer, SelfHelpGroupSerializer,
+    MyTokenObtainPairSerializer, PortfolioImageSerializer,
+    QuizSerializer, QuizCreateSerializer, JobApplicationSerializer
 )
 from .permissions import IsOwnerOrReadOnly, IsEmployer
 
-# Configure the Gemini client
+# Configure Gemini
 genai.configure(api_key=config("GOOGLE_API_KEY"))
 
 
-# --- Authentication & Registration Views ---
+# --- Authentication ---
 
-class CreateUserView(views.APIView):
-    """
-    A public view for creating a new user.
-    """
-    permission_classes = [AllowAny] # Allow anyone to access this view
+class CreateUserView(APIView):
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = UserSerializer(data=request.data)
@@ -51,184 +39,218 @@ class CreateUserView(views.APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class MyTokenObtainPairView(TokenObtainPairView):
-    """
-    Custom view for the login token to add user type.
-    """
     serializer_class = MyTokenObtainPairSerializer
 
-# --- AI Bio Generation View ---
 
-class GenerateBioView(views.APIView):
-    """
-    An API view that uses the Gemini API to generate a professional bio.
-    """
-    permission_classes = [IsAuthenticated] # Only logged-in users can use this
+# --- AI Feature ---
+
+class GenerateBioView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        # 1. Get the user's simple text
-        user_input = request.data.get('text', '')
+        user_input = request.data.get('text', '').strip()
         if not user_input:
-            return Response(
-                {'error': 'No text provided.'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'No text provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2. Create the prompt for the AI
-        prompt = f"""
-        You are an expert resume writer. A rural artisan provided the 
-        following description of their skills. Rewrite it into a 
-        professional, one-sentence bio for their profile.
-        
-        User's words: "{user_input}"
-        
-        Professional Bio:
-        """
+        prompt = (
+            f'You are an expert resume writer for rural artisans. '
+            f'A worker provided this description: "{user_input}". '
+            f'Rewrite it into a professional, concise one-paragraph bio (2-3 sentences) '
+            f'suitable for a job profile. Use simple, clear language.'
+        )
 
         try:
-            # 3. Call the Gemini API
-            model = genai.GenerativeModel('models/gemini-pro-latest')
+            # FIX: was assigning to 'mmodel' but using 'model'
+            model = genai.GenerativeModel('gemini-2.0-flash')
             response = model.generate_content(prompt)
-            
-            # 4. Send the AI's response back to the frontend
             return Response({'bio': response.text})
-
         except Exception as e:
             print(f"Gemini API Error: {e}")
-            return Response(
-                {'error': 'Failed to generate bio.'}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({'error': 'Failed to generate bio.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# --- Model ViewSets ---
+
+# --- Core Features ---
 
 class ResumeViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for a user's own resume.
-    Filters to only show the resume belonging to the logged-in user.
-    """
     serializer_class = ResumeSerializer
-    
+
     def get_permissions(self):
-        if self.action == 'list' or self.action == 'retrieve':
+        if self.action in ['list', 'retrieve']:
             permission_classes = [IsAuthenticated]
         else:
             permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):
-        """
-        This view returns a list of resumes for the
-        currently authenticated user.
-        """
-        user = self.request.user
-        return Resume.objects.filter(user=user)
+        return Resume.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
 
 class ResumeSearchView(generics.ListAPIView):
-    """
-    A read-only view for employers to search all resumes.
-    It filters by skill name using partial matching (icontains).
-    """
     serializer_class = ResumeSerializer
     permission_classes = [IsAuthenticated, IsEmployer]
 
     def get_queryset(self):
-        queryset = Resume.objects.all()
-        
-        # Get the 'skill' parameter from the URL
+        queryset = Resume.objects.select_related('user').prefetch_related('skills').all()
         skill_name = self.request.query_params.get('skill', None)
-        
-        if skill_name is not None and skill_name != "":
-            # CHANGE: Use 'icontains' for partial matching instead of 'iexact'
+        if skill_name:
             queryset = queryset.filter(skills__name__icontains=skill_name).distinct()
-            
         return queryset
 
 
 class SkillViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    A simple read-only viewset for listing all available skills.
-    """
     queryset = Skill.objects.all()
     serializer_class = SkillSerializer
-    permission_classes = [IsAuthenticated] # Only logged-in users can see skills
+    permission_classes = [IsAuthenticated]
 
-
-class JobPostingViewSet(viewsets.ModelViewSet):
-    """
-    A viewset for viewing and posting jobs.
-    - Public: List and Retrieve
-    - Employers: Create, Update, Delete
-    """
-    queryset = JobPosting.objects.all()
-    serializer_class = JobPostingSerializer
-
-    def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
-            permission_classes = [AllowAny] # Anyone can see jobs
-        else:
-            permission_classes = [IsAuthenticated, IsEmployer] # Only employers can post
-        return [permission() for permission in permission_classes]
-
-    def perform_create(self, serializer):
-        # Automatically link the job to the logged-in employer
-        serializer.save(posted_by=self.request.user)
 
 class SelfHelpGroupViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    A public, read-only viewset for listing Self Help Groups.
-    """
     queryset = SelfHelpGroup.objects.all()
     serializer_class = SelfHelpGroupSerializer
-    permission_classes = [AllowAny] # Make it public for the homepage
+    permission_classes = [AllowAny]
 
 
 class BusinessProfileViewSet(viewsets.ModelViewSet):
-    """
-    A viewset for business profiles.
-    """
     queryset = BusinessProfile.objects.all()
     serializer_class = BusinessProfileSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
 
 
 class GovtProfileViewSet(viewsets.ModelViewSet):
-    """
-    A viewset for government profiles.
-    """
     queryset = GovtProfile.objects.all()
     serializer_class = GovtProfileSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
 
+
 class PortfolioImageViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for uploading and managing portfolio images.
-    """
     serializer_class = PortfolioImageSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """
-    This view should return a list of all images
-    for the currently authenticated user's resume.
-    """
-        # Find the resume of the logged-in user
         try:
             user_resume = Resume.objects.get(user=self.request.user)
             return PortfolioImage.objects.filter(resume=user_resume)
         except Resume.DoesNotExist:
-            return PortfolioImage.objects.none() # Return no images if no resume
+            return PortfolioImage.objects.none()
 
     def perform_create(self, serializer):
-        """
-        Link the uploaded image to the user's resume.
-        """
         try:
             user_resume = Resume.objects.get(user=self.request.user)
             serializer.save(resume=user_resume)
         except Resume.DoesNotExist:
-            raise serializers.ValidationError("User has no resume to add images to.")
+            raise serializers.ValidationError("Create a resume before uploading images.")
+
+
+# --- Jobs & Applications ---
+
+class JobPostingViewSet(viewsets.ModelViewSet):
+    serializer_class = JobPostingSerializer
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [IsAuthenticated(), IsEmployer()]
+
+    def get_queryset(self):
+        queryset = JobPosting.objects.prefetch_related('required_skills').all()
+        if self.request.query_params.get('mine') == 'true' and self.request.user.is_authenticated:
+            return queryset.filter(posted_by=self.request.user)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(posted_by=self.request.user)
+
+
+class JobApplicationViewSet(viewsets.ModelViewSet):
+    serializer_class = JobApplicationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(applicant=self.request.user)
+
+    def get_queryset(self):
+        user = self.request.user
+        is_employer = (
+            BusinessProfile.objects.filter(user=user).exists() or
+            GovtProfile.objects.filter(user=user).exists()
+        )
+        if is_employer:
+            return JobApplication.objects.select_related('job', 'applicant__resume').filter(job__posted_by=user)
+        return JobApplication.objects.select_related('job').filter(applicant=user)
+
+
+# --- Quizzes ---
+
+class QuizViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Quiz.objects.prefetch_related('questions__choices').all()
+        # Allow filtering quizzes by job ID (used on JobDetailPage)
+        job_id = self.request.query_params.get('job')
+        if job_id:
+            queryset = queryset.filter(job_id=job_id)
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return QuizCreateSerializer
+        return QuizSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+
+class SubmitQuizView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            quiz = Quiz.objects.prefetch_related('questions__choices').get(pk=pk)
+        except Quiz.DoesNotExist:
+            return Response({"error": "Quiz not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Prevent re-attempts
+        if QuizAttempt.objects.filter(user=request.user, quiz=quiz).exists():
+            existing = QuizAttempt.objects.get(user=request.user, quiz=quiz)
+            return Response({
+                "score": existing.score,
+                "passed": existing.passed,
+                "message": "You have already taken this quiz.",
+                "already_attempted": True,
+            })
+
+        user_answers = request.data
+        total_questions = quiz.questions.count()
+        correct_answers = 0
+
+        for question in quiz.questions.all():
+            selected_choice_id = user_answers.get(str(question.id))
+            if selected_choice_id:
+                try:
+                    choice = Choice.objects.get(pk=selected_choice_id, question=question)
+                    if choice.is_correct:
+                        correct_answers += 1
+                except Choice.DoesNotExist:
+                    pass
+
+        score_percentage = int((correct_answers / total_questions) * 100) if total_questions > 0 else 0
+        passed = score_percentage >= 70
+
+        QuizAttempt.objects.create(
+            user=request.user,
+            quiz=quiz,
+            score=score_percentage,
+            passed=passed
+        )
+
+        return Response({
+            "score": score_percentage,
+            "passed": passed,
+            "correct_answers": correct_answers,
+            "total_questions": total_questions,
+        })

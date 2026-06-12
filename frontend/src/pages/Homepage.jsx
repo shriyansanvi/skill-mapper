@@ -18,44 +18,50 @@ import GroupIcon from '@mui/icons-material/Group';
 // API URL
 const API_URL = 'http://127.0.0.1:8000';
 
-// --- Static Data ---
+// --- Hero Carousel Data ---
 const carouselItems = [
   { 
-    title: "National Handicrafts Development Programme",
-    desc: "Implemented by the Ministry of Textiles, this program focuses on the development of the handicrafts sector.",
-    img: "https://images.unsplash.com/photo-1577907573138-1647895e7c80?auto=format&fit=crop&w=1600&q=80" 
+    title: "Empowering Rural Artisans",
+    desc: "Join the National Handicrafts Development Programme and take your skills to the global stage.",
+    img: "https://media.istockphoto.com/id/1521121142/photo/group-of-happy-young-traditional-indian-women-wearing-colorful-sari-join-hands-with-each.webp?a=1&b=1&s=612x612&w=0&k=20&c=s-JVEjBXQbZlk3FffUD_hzrUga-LlgT2578sUL4P90Y=" 
   },
   { 
     title: "Showcase Your Craft",
     desc: "From intricate weaving to beautiful pottery, your skills deserve to be seen by the world.",
-    img: "https://images.unsplash.com/photo-1510521743633-1110603b5f04?auto=format&fit=crop&w=1600&q=80"
+    img: "https://images.unsplash.com/photo-1680777019951-9cc1abaa0471?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
   },
   { 
-    title: "Empower Your Community",
+    title: "Connect & Grow",
     desc: "Join a network of talented artisans and entrepreneurs from rural areas.",
-    img: "https://images.unsplash.com/photo-1490367580463-63691a7fde15?auto=format&fit=crop&w=1600&q=80"
+    img: "https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?auto=format&fit=crop&w=1600&q=80"
   }
 ];
 
-// --- Feature Cards with Updated Links ---
+// --- Feature Cards with COLORS ---
 const features = [
   { 
     title: "Create Your Resume", 
     desc: "Get guidance on building your professional resume and portfolio for employers.",
     icon: <EditNoteIcon fontSize="large" color="primary" />,
-    link: "/dashboard" // Goes to dashboard/resume builder
+    link: "/dashboard",
+    bg: '#e3f2fd', // Light Blue Background
+    border: '#90caf9' // Blue Border
   },
   { 
     title: "Showcase Your Skills", 
     desc: "Highlight your work, upload photos, and make your profile stand out.",
     icon: <ImageIcon fontSize="large" color="success" />,
-    link: "/guide/showcase" // Goes to new Showcase Guide
+    link: "/guide/showcase",
+    bg: '#e8f5e9', // Light Green Background
+    border: '#a5d6a7' // Green Border
   },
   { 
     title: "Connect with Employers", 
     desc: "Find opportunities tailored to your expertise and local area.",
     icon: <ConnectWithoutContactIcon fontSize="large" color="error" />,
-    link: "/guide/connect" // Goes to new Connect Guide
+    link: "/guide/connect",
+    bg: '#fff3e0', // Light Orange Background
+    border: '#ffcc80' // Orange Border
   }
 ];
 
@@ -70,7 +76,6 @@ const getJobTypeColor = (jobType) => {
 };
 
 function Homepage() {
-  // --- State for Dynamic Data ---
   const [jobs, setJobs] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [jobsError, setJobsError] = useState('');
@@ -79,7 +84,6 @@ function Homepage() {
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [groupsError, setGroupsError] = useState('');
 
-  // --- Fetch Data on Page Load ---
   useEffect(() => {
     // Fetch Jobs
     axios.get(`${API_URL}/api/jobs/`)
@@ -104,9 +108,8 @@ function Homepage() {
         setGroupsError("Could not load self-help groups.");
         setGroupsLoading(false);
       });
-  }, []);
+  }, []); 
 
-  // Carousel settings
   const sliderSettings = {
     dots: true,
     infinite: true,
@@ -115,83 +118,28 @@ function Homepage() {
     slidesToScroll: 1,
     autoplay: true,
     fade: true,
+    arrows: false,
     appendDots: dots => (
-      <Box 
-        sx={{ 
-          position: 'absolute', 
-          bottom: { xs: '20px', md: '30px' }, 
-          left: { xs: '20px', md: '50px' }, 
-          ul: { margin: "0px", padding: 0, display: 'flex' },
-          li: { 
-            margin: '0 5px', 
-            '& button::before': {
-              fontSize: '10px',
-              color: 'rgba(255, 255, 255, 0.7)',
-            },
-            '&.slick-active button::before': {
-              color: 'white',
-            }
-          }
-        }}
-      >
+      <Box sx={{ position: 'absolute', bottom: '20px', width: '100%', display: 'flex', justifyContent: 'center', padding: 0, '& ul': { margin: 0, padding: 0, display: 'flex' }, '& li': { margin: '0 5px', '& button::before': { fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', opacity: 1 }, '&.slick-active button::before': { color: 'white', fontSize: '14px' } } }}>
         <ul> {dots} </ul>
       </Box>
     ),
   };
 
   return (
-    <Box>
+    <Box sx={{ bgcolor: '#eef2ff', minHeight: '100vh', pb: 8 }}>
+      
       {/* --- Image Carousel Section --- */}
       <Box sx={{ mb: 8, width: '100%', position: 'relative' }}>
         <Slider {...sliderSettings}>
           {carouselItems.map((item) => (
-            <Box key={item.title} sx={{ position: 'relative', height: '400px' }}>
-              <Box 
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  backgroundImage: `url(${item.img})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}
-              />
-              <Box 
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                }}
-              />
-              <Container 
-                maxWidth="lg" 
-                sx={{ 
-                  height: '100%', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'center', 
-                  alignItems: 'flex-start',
-                  position: 'relative',
-                  color: 'white',
-                  px: { xs: 2, md: 4 } 
-                }}
-              >
-                <Box 
-                  sx={{
-                    maxWidth: { xs: '100%', md: '50%' },
-                  }}
-                >
-                  <Typography variant="h3" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
-                    {item.title}
-                  </Typography>
-                  <Typography variant="h6">
-                    {item.desc}
-                  </Typography>
+            <Box key={item.title} sx={{ position: 'relative', height: '500px', outline: 'none' }}>
+              <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundImage: `url(${item.img})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+              <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.5)' }} />
+              <Container maxWidth="lg" sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', position: 'relative', color: 'white', textAlign: 'center', px: 2 }}>
+                <Box sx={{ maxWidth: '800px' }}>
+                  <Typography variant="h3" component="h2" gutterBottom sx={{ fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{item.title}</Typography>
+                  <Typography variant="h6" sx={{ opacity: 0.9 }}>{item.desc}</Typography>
                 </Box>
               </Container>
             </Box>
@@ -199,106 +147,60 @@ function Homepage() {
         </Slider>
       </Box>
       
-      {/* Container for the rest of the page content */}
       <Container maxWidth="lg">
         {/* --- "Build Your Future" Section --- */}
         <Box sx={{ textAlign: 'center', my: 8 }}>
-          <Typography variant="h4" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
-            Build Your Future
-          </Typography>
-          
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              flexDirection: { xs: 'column', md: 'row' },
-              gap: 4, 
-              mt: 4 
-            }}
-          >
+          <Typography variant="h4" component="h2" gutterBottom sx={{ fontWeight: 'bold', color: '#1a237e' }}>Build Your Future</Typography>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4, mt: 4 }}>
             {features.map((feature) => (
               <Card 
                 key={feature.title}
                 component={Link} 
-                to={feature.link} // Uses the updated links
+                to={feature.link}
                 sx={{ 
-                  flex: 1, 
-                  p: 2, 
-                  boxShadow: 3, 
-                  borderRadius: 2,
-                  textAlign: 'left',
-                  textDecoration: 'none',
-                  transition: '0.2s',
-                  '&:hover': {
-                    transform: 'scale(1.03)',
-                    boxShadow: 6,
-                  }
+                  flex: 1, p: 2, boxShadow: 1, borderRadius: 2, textAlign: 'left', textDecoration: 'none', 
+                  bgcolor: feature.bg, border: `1px solid ${feature.border}`,
+                  transition: '0.2s', '&:hover': { transform: 'scale(1.03)', boxShadow: 4 }
                 }}
               >
                 <CardContent>
                   <Box sx={{ mb: 2 }}>{feature.icon}</Box>
-                  <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    {feature.title}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    {feature.desc}
-                  </Typography>
+                  <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>{feature.title}</Typography>
+                  <Typography variant="body2" color="textSecondary">{feature.desc}</Typography>
                 </CardContent>
               </Card>
             ))}
           </Box>
         </Box>
 
-        {/* --- "Jobs Around You" Section (Dynamic) --- */}
-        <Box sx={{ my: 8 }}>
+        {/* --- "Jobs Around You" Section --- */}
+        <Box sx={{ my: 8, bgcolor: '#ffffff', p: 4, borderRadius: 2, boxShadow: 1 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-            <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold' }}>
-              Jobs Around You
-            </Typography>
-            <Button component={Link} to="/dashboard">View All &rarr;</Button>
+            <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', color: '#1a237e' }}>Jobs Around You</Typography>
+            {/* CHANGE: Link to /explore to see all jobs */}
+            <Button component={Link} to="/explore">View All &rarr;</Button>
           </Box>
           
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              flexDirection: { xs: 'column', md: 'row' },
-              gap: 4,
-            }}
-          >
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4 }}>
             {jobsLoading ? (
-              <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                <CircularProgress />
-              </Box>
+              <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}><CircularProgress /></Box>
             ) : jobsError ? (
               <Alert severity="error" sx={{ width: '100%' }}>{jobsError}</Alert>
             ) : (
-              jobs.map((job) => (
+              // CHANGE: .slice(0, 3) limits the display to 3 items
+              jobs.slice(0, 3).map((job) => (
                 <Card 
                   key={job.id}
-                  sx={{ 
-                    flex: 1, 
-                    p: 2, 
-                    boxShadow: 3, 
-                    borderRadius: 2 
-                  }}
+                  sx={{ flex: 1, p: 2, boxShadow: 2, borderRadius: 2, bgcolor: '#f9fafb', border: '1px solid #eee' }}
                 >
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                       <WorkIcon color="action" />
-                      <Chip 
-                        label={job.job_type}
-                        color={getJobTypeColor(job.job_type)}
-                        size="small" 
-                      />
+                      <Chip label={job.job_type} color={getJobTypeColor(job.job_type)} size="small" />
                     </Box>
-                    <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      {job.title}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      {job.company_name} - {job.location}
-                    </Typography>
-                    <Button component={Link} to={`/jobs/${job.id}`} size="small" sx={{ mt: 2 }}>
-                      View Details &rarr;
-                    </Button> 
+                    <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>{job.title}</Typography>
+                    <Typography variant="body2" color="textSecondary">{job.company_name} - {job.location}</Typography>
+                    <Button component={Link} to={`/jobs/${job.id}`} size="small" sx={{ mt: 2 }}>View Details &rarr;</Button> 
                   </CardContent>
                 </Card>
               ))
@@ -306,55 +208,36 @@ function Homepage() {
           </Box>
         </Box>
 
-        {/* --- "Self-Help Groups" Section (Dynamic) --- */}
-        <Box sx={{ my: 8, bgcolor: '#f7f9fc', p: 4, borderRadius: 2 }}>
-          <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', textAlign: 'center', mb: 4 }}>
+        {/* --- "Self-Help Groups" Section --- */}
+        <Box sx={{ my: 8, bgcolor: '#e0e7ff', p: 4, borderRadius: 2, boxShadow: 1 }}>
+          <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', textAlign: 'center', mb: 4, color: '#1a237e' }}>
             Self-Help Groups Near You
           </Typography>
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              flexDirection: { xs: 'column', md: 'row' },
-              gap: 4,
-            }}
-          >
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4 }}>
             {groupsLoading ? (
-              <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                <CircularProgress />
-              </Box>
+              <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}><CircularProgress /></Box>
             ) : groupsError ? (
               <Alert severity="error" sx={{ width: '100%' }}>{groupsError}</Alert>
             ) : (
-              groups.map((group) => (
+              // CHANGE: .slice(0, 3) limits to 3 items
+              groups.slice(0, 3).map((group) => (
                 <Card 
                   key={group.id}
-                  sx={{ 
-                    flex: 1, 
-                    p: 2, 
-                    boxShadow: 2, 
-                    borderRadius: 2 
-                  }}
+                  sx={{ flex: 1, p: 2, boxShadow: 1, borderRadius: 2, bgcolor: '#ffffff' }}
                 >
                   <CardContent>
                     <GroupIcon color="secondary" sx={{ mb: 2 }} />
-                    <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      {group.name}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Topic: {group.topic} | {group.member_count} Members
-                    </Typography>
-                    <Button 
-                      component={Link} 
-                      to={`/groups/${group.id}`} 
-                      size="small" 
-                      sx={{ mt: 2 }}
-                    >
-                      View & Join &rarr;
-                    </Button>
+                    <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>{group.name}</Typography>
+                    <Typography variant="body2" color="textSecondary">Topic: {group.topic} | {group.member_count} Members</Typography>
+                    <Button component={Link} to={`/groups/${group.id}`} size="small" sx={{ mt: 2, color: '#7b1fa2' }}>View & Join &rarr;</Button>
                   </CardContent>
                 </Card>
               ))
             )}
+          </Box>
+          {/* CHANGE: Added View All button for Groups */}
+          <Box sx={{ textAlign: 'center', mt: 4 }}>
+             <Button component={Link} to="/explore" variant="contained" sx={{ bgcolor: '#1a237e' }}>View All Groups &rarr;</Button>
           </Box>
         </Box>
         

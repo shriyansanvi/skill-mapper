@@ -1,79 +1,129 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Container, Box, CircularProgress, Alert, Paper, Button } from '@mui/material';
+import {
+  Typography, Container, Box, CircularProgress, Alert, Paper,
+  Button, Chip, Stack, Divider, Avatar, Snackbar
+} from '@mui/material';
 import { useParams, Link } from 'react-router-dom';
-import axios from 'axios';
-import GroupIcon from '@mui/icons-material/Group';
-
-const API_URL = 'http://127.0.0.1:8000';
+import { api } from '../context/AuthContext.jsx';
+import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded';
+import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded';
+import PeopleRoundedIcon from '@mui/icons-material/PeopleRounded';
+import TopicRoundedIcon from '@mui/icons-material/TopicRounded';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 function GroupDetailPage() {
-  const { groupId } = useParams(); // Gets the '1' from the URL
+  const { groupId } = useParams();
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [joined, setJoined] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   useEffect(() => {
-    const fetchGroup = () => {
-      setLoading(true);
-      setError('');
+    api.get(`/api/groups/${groupId}/`)
+      .then(({ data }) => { setGroup(data); setLoading(false); })
+      .catch(() => { setError('Could not load group details.'); setLoading(false); });
+  }, [groupId]);
 
-      axios.get(`${API_URL}/api/groups/${groupId}/`)
-        .then(response => {
-          setGroup(response.data);
-          setLoading(false);
-        })
-        .catch(err => {
-          console.error("Failed to fetch group details:", err);
-          setError("Could not load group details.");
-          setLoading(false);
-        });
-    };
+  const handleJoin = () => {
+    setJoined(true);
+    setSnackbarOpen(true);
+  };
 
-    fetchGroup();
-  }, [groupId]); // Refetch if the groupId in the URL changes
+  if (loading) return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+      <CircularProgress />
+    </Box>
+  );
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  if (error) return (
+    <Container maxWidth="md" sx={{ mt: 4 }}>
+      <Alert severity="error">{error}</Alert>
+      <Button component={Link} to="/explore" startIcon={<ArrowBackIcon />} sx={{ mt: 2 }}>Back to Explore</Button>
+    </Container>
+  );
 
-  if (error) {
-    return <Alert severity="error">{error}</Alert>;
-  }
-
-  if (!group) {
-    return <Typography>Group not found.</Typography>;
-  }
+  if (!group) return null;
 
   return (
-    <Container maxWidth="md">
-      <Paper sx={{ p: 4, boxShadow: 3, borderRadius: 2 }}>
-        <GroupIcon color="secondary" sx={{ fontSize: 40, mb: 2 }} />
-        <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
-          {group.name}
-        </Typography>
-        <Typography variant="h6" color="textSecondary" gutterBottom>
-          Topic: {group.topic}
-        </Typography>
-        <Typography variant="body1" sx={{ mt: 2 }}>
-          <strong>Location:</strong> {group.location || 'Not specified'}
-        </Typography>
-        <Typography variant="body1">
-          <strong>Members:</strong> {group.member_count}
-        </Typography>
-        
-        <Button variant="contained" size="large" sx={{ mt: 4 }}>
-          Join This Group
-        </Button>
-      </Paper>
-      
-      <Button component={Link} to="/" sx={{ mt: 2 }}>
-        &larr; Back to Homepage
-      </Button>
-    </Container>
+    <Box sx={{ bgcolor: '#f8fafc', minHeight: '100vh', pb: 8 }}>
+      {/* Header Banner */}
+      <Box sx={{ bgcolor: '#0f172a', py: 6 }}>
+        <Container maxWidth="md">
+          <Button component={Link} to="/explore" startIcon={<ArrowBackIcon />} sx={{ color: '#94a3b8', mb: 3, textTransform: 'none' }}>
+            Back to Explore
+          </Button>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <Avatar sx={{ width: 80, height: 80, bgcolor: '#7c3aed', borderRadius: 3 }}>
+              <Diversity3RoundedIcon sx={{ fontSize: 40 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="h3" fontWeight="800" color="white">{group.name}</Typography>
+              <Chip label={group.topic} size="small" sx={{ mt: 1, bgcolor: 'rgba(124,58,237,0.2)', color: '#c4b5fd', border: '1px solid #7c3aed' }} />
+            </Box>
+          </Box>
+        </Container>
+      </Box>
+
+      <Container maxWidth="md" sx={{ mt: 4 }}>
+        <Stack spacing={3}>
+          {/* Stats Row */}
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            {[
+              { icon: <PeopleRoundedIcon />, label: 'Members', value: group.member_count, color: '#7c3aed' },
+              { icon: <PlaceRoundedIcon />, label: 'Location', value: group.location || 'Not specified', color: '#0ea5e9' },
+              { icon: <TopicRoundedIcon />, label: 'Topic', value: group.topic, color: '#10b981' },
+            ].map((stat) => (
+              <Paper key={stat.label} elevation={0} sx={{ flex: 1, p: 3, borderRadius: 3, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Avatar sx={{ bgcolor: stat.color + '15', color: stat.color }}>
+                  {stat.icon}
+                </Avatar>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" fontWeight="bold">{stat.label.toUpperCase()}</Typography>
+                  <Typography variant="body1" fontWeight="600">{stat.value}</Typography>
+                </Box>
+              </Paper>
+            ))}
+          </Stack>
+
+          {/* Main Card */}
+          <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
+            <Typography variant="h6" fontWeight="700" gutterBottom>About This Group</Typography>
+            <Typography color="text.secondary" sx={{ lineHeight: 1.8 }}>
+              This self-help group brings together members focused on <strong>{group.topic}</strong>.
+              With {group.member_count} active members{group.location ? ` in ${group.location}` : ''}, it's a great place to share resources, find opportunities, and grow together.
+            </Typography>
+
+            <Divider sx={{ my: 3 }} />
+
+            {joined ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid #bbf7d0' }}>
+                <CheckCircleIcon color="success" />
+                <Typography color="success.main" fontWeight="600">You've joined this group! The group admin will contact you.</Typography>
+              </Box>
+            ) : (
+              <Button
+                variant="contained"
+                size="large"
+                onClick={handleJoin}
+                sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' }, textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 4 }}
+              >
+                Join This Group
+              </Button>
+            )}
+          </Paper>
+        </Stack>
+      </Container>
+
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        message="Successfully joined the group!"
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+    </Box>
   );
 }
 

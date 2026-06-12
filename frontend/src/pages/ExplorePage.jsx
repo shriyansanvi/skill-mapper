@@ -3,7 +3,7 @@ import axios from 'axios';
 import { 
   Container, Typography, Box, Grid, Card, CardContent, Chip, 
   Button, CircularProgress, Alert, Tab, Tabs, Paper, Stack, Divider, 
-  TextField, InputAdornment, Avatar // <--- Added Avatar here
+  TextField, InputAdornment, Avatar 
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 
@@ -13,6 +13,7 @@ import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded';
 import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
 import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded';
 import SearchIcon from '@mui/icons-material/Search';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 
 const API_URL = 'http://127.0.0.1:8000';
 
@@ -27,14 +28,13 @@ const getJobTypeColor = (jobType) => {
 };
 
 function ExplorePage() {
-  const [tabValue, setTabValue] = useState(0); // 0 for Jobs, 1 for Groups
+  const [tabValue, setTabValue] = useState(0); 
   const [jobs, setJobs] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // --- Fetch All Data ---
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -55,12 +55,10 @@ function ExplorePage() {
     fetchData();
   }, []);
 
-  // --- Handle Tab Change ---
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
 
-  // --- Filter Data based on Search ---
   const filteredJobs = jobs.filter(job => 
     job.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
     job.location.toLowerCase().includes(searchTerm.toLowerCase())
@@ -72,71 +70,90 @@ function ExplorePage() {
   );
 
   return (
-    <Box sx={{ bgcolor: '#f8fafc', minHeight: '100vh', pb: 8 }}>
+    <Box sx={{ bgcolor: '#e3f2fd', minHeight: '100vh', pb: 8 }}>
       
       {/* --- Header --- */}
       <Box sx={{ bgcolor: '#fff', py: 6, borderBottom: '1px solid #e2e8f0' }}>
-        <Container maxWidth="lg">
-          <Typography variant="h3" fontWeight="800" color="#0f172a" gutterBottom>
-            Explore Opportunities
+        {/* Changed to 'md' so the vertical list isn't too wide */}
+        <Container maxWidth="md"> 
+          <Typography variant="overline" sx={{ fontWeight: 'bold', color: '#1976d2', letterSpacing: 1 }}>
+            OPPORTUNITIES
           </Typography>
-          <Typography variant="h6" color="text.secondary" fontWeight="normal">
-            Find the perfect job or community to grow your skills.
+          <Typography variant="h3" fontWeight="800" color="#0f172a" gutterBottom sx={{ mt: 1 }}>
+            Explore & Connect
+          </Typography>
+          <Typography variant="h6" color="text.secondary" fontWeight="normal" sx={{ maxWidth: '600px', mb: 4 }}>
+            Browse hundreds of local jobs and community groups.
           </Typography>
 
-          {/* --- Search Bar --- */}
-          <TextField 
-            fullWidth 
-            variant="outlined"
-            placeholder="Search by title, location, or topic..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ mt: 4, bgcolor: 'white' }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon color="action" />
-                </InputAdornment>
-              ),
-            }}
-          />
+          <Paper elevation={0} sx={{ p: '2px 4px', display: 'flex', alignItems: 'center', width: '100%', border: '1px solid #cbd5e1', borderRadius: 3 }}>
+            <InputAdornment position="start" sx={{ pl: 2 }}><SearchIcon color="action" /></InputAdornment>
+            <TextField
+              sx={{ ml: 1, flex: 1, "& fieldset": { border: 'none' } }}
+              placeholder="Search..."
+              variant="outlined"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </Paper>
         </Container>
       </Box>
 
-      {/* --- Tabs --- */}
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="explore tabs">
-            <Tab label="Jobs" sx={{ fontWeight: 'bold', fontSize: '1rem' }} />
-            <Tab label="Self-Help Groups" sx={{ fontWeight: 'bold', fontSize: '1rem' }} />
+      {/* --- Main Content --- */}
+      <Container maxWidth="md" sx={{ mt: 4 }}>
+        
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 5 }}>
+          <Tabs value={tabValue} onChange={handleTabChange} textColor="primary" indicatorColor="primary">
+            <Tab label={`Jobs (${filteredJobs.length})`} sx={{ fontWeight: 'bold' }} />
+            <Tab label={`Self-Help Groups (${filteredGroups.length})`} sx={{ fontWeight: 'bold' }} />
           </Tabs>
         </Box>
 
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
         ) : error ? (
           <Alert severity="error">{error}</Alert>
         ) : (
           <>
-            {/* --- JOBS TAB (Index 0) --- */}
+            {/* --- JOBS TAB --- */}
             {tabValue === 0 && (
               <Grid container spacing={3}>
-                {filteredJobs.length === 0 && <Typography sx={{ mt: 4, width: '100%', textAlign: 'center' }}>No jobs found.</Typography>}
+                {filteredJobs.length === 0 && <Grid item size={{ xs: 12 }}><Typography align="center">No jobs found.</Typography></Grid>}
                 {filteredJobs.map((job) => (
-                  <Grid item xs={12} md={6} lg={4} key={job.id}>
-                    <Card elevation={0} sx={{ height: '100%', border: '1px solid #e2e8f0', borderRadius: 3, transition: '0.2s', '&:hover': { borderColor: '#1976d2', boxShadow: '0 8px 20px -4px rgba(0,0,0,0.1)' } }}>
+                  // CHANGE: size={{ xs: 12 }} forces it to be a vertical list (1 column)
+                  <Grid size={{ xs: 12 }} key={job.id}>
+                    <Card 
+                      elevation={0} 
+                      sx={{ 
+                        display: 'flex', flexDirection: 'column', 
+                        border: '1px solid #e2e8f0', borderRadius: 4, 
+                        bgcolor: '#ffffff', 
+                        transition: '0.2s', '&:hover': { borderColor: '#1976d2', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }
+                      }}
+                    >
                       <CardContent sx={{ p: 3 }}>
-                        <Stack direction="row" justifyContent="space-between" mb={2}>
+                        <Stack direction="row" justifyContent="space-between" mb={1}>
+                          <Chip label={job.job_type} color={getJobTypeColor(job.job_type)} size="small" />
+                          <Typography variant="caption" color="text.secondary">Posted recently</Typography>
+                        </Stack>
+                        
+                        <Stack direction="row" spacing={2} alignItems="center" mb={2}>
                           <Avatar sx={{ bgcolor: '#f0f9ff', color: '#0288d1' }}><WorkOutlineRoundedIcon /></Avatar>
-                          <Chip label={job.job_type} color={getJobTypeColor(job.job_type)} size="small" sx={{ fontWeight: 'bold', borderRadius: 1 }} />
+                          <Box>
+                            <Typography variant="h6" fontWeight="bold">{job.title}</Typography>
+                            <Typography variant="body2" color="text.secondary">{job.company_name}</Typography>
+                          </Box>
                         </Stack>
-                        <Typography variant="h6" fontWeight="bold" gutterBottom>{job.title}</Typography>
-                        <Stack spacing={1} sx={{ mb: 3, color: 'text.secondary' }}>
-                          <Box display="flex" alignItems="center" gap={1}><BusinessRoundedIcon fontSize="small" /><Typography variant="body2">{job.company_name}</Typography></Box>
-                          <Box display="flex" alignItems="center" gap={1}><PlaceRoundedIcon fontSize="small" /><Typography variant="body2">{job.location}</Typography></Box>
-                        </Stack>
-                        <Divider sx={{ mb: 2 }} />
-                        <Button component={Link} to={`/jobs/${job.id}`} fullWidth variant="outlined" sx={{ textTransform: 'none', fontWeight: 'bold' }}>View Details</Button>
+                        
+                        <Divider sx={{ my: 2 }} />
+                        
+                        <Box display="flex" justifyContent="space-between" alignItems="center">
+                          <Box display="flex" alignItems="center" gap={1}>
+                             <PlaceRoundedIcon fontSize="small" color="action" />
+                             <Typography variant="body2">{job.location}</Typography>
+                          </Box>
+                          <Button component={Link} to={`/jobs/${job.id}`} variant="contained" size="small" sx={{ textTransform: 'none', bgcolor: '#1976d2' }}>View Details</Button>
+                        </Box>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -144,19 +161,30 @@ function ExplorePage() {
               </Grid>
             )}
 
-            {/* --- GROUPS TAB (Index 1) --- */}
+            {/* --- GROUPS TAB --- */}
             {tabValue === 1 && (
               <Grid container spacing={3}>
-                {filteredGroups.length === 0 && <Typography sx={{ mt: 4, width: '100%', textAlign: 'center' }}>No groups found.</Typography>}
+                {filteredGroups.length === 0 && <Grid item size={{ xs: 12 }}><Typography align="center">No groups found.</Typography></Grid>}
                 {filteredGroups.map((group) => (
-                  <Grid item xs={12} md={6} lg={4} key={group.id}>
-                    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 2, transition: '0.2s', '&:hover': { borderColor: '#90caf9', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' } }}>
-                      <Avatar sx={{ bgcolor: '#f3e5f5', color: '#7b1fa2', width: 56, height: 56 }}><Diversity3RoundedIcon /></Avatar>
-                      <Box sx={{ flexGrow: 1 }}>
-                        <Typography variant="subtitle1" fontWeight="bold">{group.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">{group.topic} • {group.member_count} Members</Typography>
+                  // CHANGE: size={{ xs: 12 }} forces it to be a vertical list
+                  <Grid size={{ xs: 12 }} key={group.id}>
+                    <Paper 
+                      elevation={0} 
+                      sx={{ 
+                        p: 3, borderRadius: 4, border: '1px solid #e2e8f0', bgcolor: '#ffffff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        transition: '0.2s', '&:hover': { borderColor: '#90caf9', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' } 
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Avatar sx={{ bgcolor: '#f3e5f5', color: '#7b1fa2', width: 56, height: 56 }}><Diversity3RoundedIcon /></Avatar>
+                        <Box>
+                          <Typography variant="subtitle1" fontWeight="bold">{group.name}</Typography>
+                          <Typography variant="body2" color="text.secondary">{group.member_count} Members • {group.topic}</Typography>
+                        </Box>
                       </Box>
-                      <Button component={Link} to={`/groups/${group.id}`} variant="contained" size="small" sx={{ bgcolor: '#9c27b0', '&:hover': { bgcolor: '#7b1fa2' } }}>Join</Button>
+                      
+                      <Button component={Link} to={`/groups/${group.id}`} variant="outlined" size="small" sx={{ color: '#7b1fa2', borderColor: '#7b1fa2' }}>Join Group</Button>
                     </Paper>
                   </Grid>
                 ))}
