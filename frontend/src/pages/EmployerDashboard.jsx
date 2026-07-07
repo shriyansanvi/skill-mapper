@@ -17,6 +17,8 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import DescriptionIcon from '@mui/icons-material/Description';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import QuizIcon from '@mui/icons-material/Quiz';
 
 const API_URL = 'http://127.0.0.1:8000';
 
@@ -33,19 +35,37 @@ function EmployerDashboard() {
   const [candidates, setCandidates] = useState([]);
   const [applications, setApplications] = useState([]);
   
-  // --- Modal State ---
   const [selectedApp, setSelectedApp] = useState(null); 
   const [statusLoading, setStatusLoading] = useState(false);
+
+  // --- AI Quiz Generation State ---
+  const [quizDialogOpen, setQuizDialogOpen] = useState(false);
+  const [quizJobTarget, setQuizJobTarget] = useState(null); // job object the quiz is being created for
+  const [quizTopic, setQuizTopic] = useState('');
+  const [quizGenerating, setQuizGenerating] = useState(false);
+  const [quizError, setQuizError] = useState('');
+  const [jobsWithQuiz, setJobsWithQuiz] = useState({}); // { jobId: true } once a quiz exists
   
   const [searchTerm, setSearchTerm] = useState('');
   const [jobForm, setJobForm] = useState({
     title: '', company_name: '', location: '', job_type: 'Full-time', description: ''
   });
 
-  // --- Fetching Logic ---
   const fetchMyJobs = () => {
     axios.get(`${API_URL}/api/jobs/?mine=true`, { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(res => setMyJobs(res.data))
+      .then(res => {
+        setMyJobs(res.data);
+        // Check which of these jobs already have a quiz attached
+        axios.get(`${API_URL}/api/quizzes/`, { headers: { 'Authorization': `Bearer ${token}` } })
+          .then(quizRes => {
+            const quizMap = {};
+            quizRes.data.forEach(quiz => {
+              if (quiz.job) quizMap[quiz.job] = true;
+            });
+            setJobsWithQuiz(quizMap);
+          })
+          .catch(err => console.error('Failed to fetch quizzes', err));
+      })
       .catch(err => console.error(err));
   };
 
@@ -73,7 +93,6 @@ function EmployerDashboard() {
     }
   }, [tabValue, token]);
 
-  // --- Handlers ---
   const handlePostJob = (e) => {
     e.preventDefault();
     setLoading(true);
@@ -92,6 +111,47 @@ function EmployerDashboard() {
   
   const handleInputChange = (e) => setJobForm({ ...jobForm, [e.target.name]: e.target.value });
   const handleCloseSnackbar = () => setSnackbarOpen(false);
+
+  // --- AI Quiz Generation Handlers ---
+  const openQuizDialog = (job) => {
+    setQuizJobTarget(job);
+    setQuizTopic('');
+    setQuizError('');
+    setQuizDialogOpen(true);
+  };
+
+  const closeQuizDialog = () => {
+    setQuizDialogOpen(false);
+    setQuizJobTarget(null);
+    setQuizTopic('');
+    setQuizError('');
+  };
+
+  const handleGenerateQuiz = () => {
+    if (!quizTopic.trim()) {
+      setQuizError('Please enter a topic for the quiz.');
+      return;
+    }
+    setQuizGenerating(true);
+    setQuizError('');
+
+    axios.post(
+      `${API_URL}/api/jobs/${quizJobTarget.id}/generate-quiz/`,
+      { topic: quizTopic, num_questions: 5 },
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    )
+    .then((res) => {
+      setQuizGenerating(false);
+      setJobsWithQuiz(prev => ({ ...prev, [quizJobTarget.id]: true }));
+      setSnackbarOpen(true);
+      closeQuizDialog();
+    })
+    .catch((err) => {
+      setQuizGenerating(false);
+      const msg = err?.response?.data?.error || 'Failed to generate quiz. Please try again.';
+      setQuizError(msg);
+    });
+  };
 
   const handleStatusChange = (newStatus) => {
     if(!selectedApp) return;
@@ -127,7 +187,6 @@ function EmployerDashboard() {
   };
 
   return (
-    // FIXED: maxWidth="sm" keeps it compact and centered (not stretched)
     <Container maxWidth="md" sx={{ pb: 8 }}>
       
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, mt: 4 }}>
@@ -154,7 +213,6 @@ function EmployerDashboard() {
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             
             <form onSubmit={handlePostJob}>
-              {/* FIXED: size={{ xs: 12 }} forces all fields to be vertical (stacked) */}
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12 }}><TextField label="Job Title" name="title" fullWidth required value={jobForm.title} onChange={handleInputChange} /></Grid>
                 <Grid size={{ xs: 12 }}><TextField label="Company Name" name="company_name" fullWidth required value={jobForm.company_name} onChange={handleInputChange} /></Grid>
@@ -175,11 +233,40 @@ function EmployerDashboard() {
           
           <Divider textAlign="left" sx={{ mb: 3 }}><Chip label="Your Posted Jobs" /></Divider>
           
+          {myJobs.length === 0 && (
+            <Typography align="center" sx={{ mt: 4, color: 'gray' }}>You haven't posted any jobs yet.</Typography>
+          )}
+
           {myJobs.map(job => (
             <Card key={job.id} sx={{ mb: 2, borderRadius: 2, boxShadow: 1, border: '1px solid #eee' }}>
               <CardContent>
                 <Box display="flex" justifyContent="space-between"><Typography variant="h6" fontWeight="bold" color="#1565c0">{job.title}</Typography><Chip label={job.job_type} size="small" color="primary" variant="outlined" /></Box>
-                <Typography variant="body2" color="text.secondary">{job.company_name} • {job.location}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{job.company_name} • {job.location}</Typography>
+
+                {jobsWithQuiz[job.id] ? (
+                  <Chip
+                    icon={<QuizIcon />}
+                    label="Quiz Created"
+                    size="small"
+                    color="success"
+                    variant="outlined"
+                  />
+                ) : (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<AutoAwesomeIcon />}
+                    onClick={() => openQuizDialog(job)}
+                    sx={{
+                      textTransform: 'none',
+                      borderColor: '#7c3aed',
+                      color: '#7c3aed',
+                      '&:hover': { bgcolor: 'rgba(124,58,237,0.08)', borderColor: '#7c3aed' },
+                    }}
+                  >
+                    Generate Quiz with AI
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -212,33 +299,103 @@ function EmployerDashboard() {
         </Box>
       )}
 
-      {/* --- TAB 2: SEARCH CANDIDATES --- */}
+      {/* --- TAB 2: SEARCH CANDIDATES (Fixed Card Layout) --- */}
       {tabValue === 2 && (
         <Box>
           <Paper elevation={1} sx={{ p: 2, mb: 4, display: 'flex', gap: 2, borderRadius: 2 }}>
             <TextField label="Search by Skill" variant="outlined" size="small" fullWidth value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             <Button variant="contained" onClick={() => fetchCandidates(searchTerm)} sx={{ px: 4, fontWeight: 'bold', bgcolor: '#1565c0' }}>Search</Button>
           </Paper>
-          <Grid container spacing={3}>
-            {candidates.map(resume => (
-              <Grid size={{ xs: 12 }} key={resume.id}>
-                <Card sx={{ borderRadius: 3, boxShadow: 2, display: 'flex', p: 2, alignItems: 'center' }}>
-                  <Avatar sx={{ width: 64, height: 64, bgcolor: '#1565c0', mr: 3 }}>{resume.full_name ? resume.full_name.charAt(0) : <PersonIcon />}</Avatar>
-                  <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="h6" fontWeight="bold">{resume.full_name || "Artisan"}</Typography>
-                    <Typography variant="body1" sx={{ mb: 1 }}>{resume.bio}</Typography>
-                    <Box sx={{ display: 'flex', gap: 1 }}>{resume.skills && resume.skills.map(skill => <Chip key={skill.id} label={skill.name} size="small" variant="outlined" />)}</Box>
+
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+          ) : (
+            <Stack spacing={2}>
+              {candidates.length === 0 && (
+                <Typography align="center" sx={{ mt: 4, color: 'gray' }}>No candidates found.</Typography>
+              )}
+
+              {candidates.map(resume => (
+                <Card
+                  key={resume.id}
+                  sx={{
+                    borderRadius: 3,
+                    boxShadow: 2,
+                    p: 3,
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '56px 1fr', sm: '64px 1fr 140px' },
+                    gridTemplateRows: { xs: 'auto auto', sm: 'auto' },
+                    columnGap: 3,
+                    rowGap: 1.5,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Avatar
+                    sx={{
+                      width: 56, height: 56,
+                      bgcolor: '#1565c0',
+                      fontSize: '1.5rem',
+                      gridRow: { xs: '1 / 3', sm: '1' },
+                    }}
+                  >
+                    {resume.full_name ? resume.full_name.charAt(0).toUpperCase() : <PersonIcon />}
+                  </Avatar>
+
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="h6" fontWeight="bold" noWrap>
+                      {resume.full_name || 'Artisan'}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mb: 1,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {resume.bio || 'No bio provided yet.'}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {resume.skills && resume.skills.length > 0 ? (
+                        resume.skills.slice(0, 4).map(skill => (
+                          <Chip key={skill.id} label={skill.name} size="small" variant="outlined" />
+                        ))
+                      ) : (
+                        <Chip label="No skills listed" size="small" variant="outlined" sx={{ color: 'text.disabled' }} />
+                      )}
+                      {resume.skills && resume.skills.length > 4 && (
+                        <Chip label={`+${resume.skills.length - 4}`} size="small" sx={{ bgcolor: '#f1f5f9' }} />
+                      )}
+                    </Box>
                   </Box>
-                  <Button variant="outlined" size="small" onClick={() => handleViewCandidate(resume)}>View Profile</Button>
+
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => handleViewCandidate(resume)}
+                    sx={{
+                      gridColumn: { xs: '2', sm: '3' },
+                      justifySelf: { xs: 'start', sm: 'end' },
+                      whiteSpace: 'nowrap',
+                      minWidth: 120,
+                    }}
+                  >
+                    View Profile
+                  </Button>
                 </Card>
-              </Grid>
-            ))}
-          </Grid>
+              ))}
+            </Stack>
+          )}
         </Box>
       )}
 
       <Snackbar open={snackbarOpen} autoHideDuration={3000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert onClose={handleCloseSnackbar} severity="success" variant="filled" sx={{ width: '100%' }}>Job Posted Successfully!</Alert>
+        <Alert onClose={handleCloseSnackbar} severity="success" variant="filled" sx={{ width: '100%' }}>
+          {postSuccess ? 'Job Posted Successfully!' : 'Quiz Generated Successfully!'}
+        </Alert>
       </Snackbar>
 
       {/* --- RESUME MODAL --- */}
@@ -295,6 +452,48 @@ function EmployerDashboard() {
           </DialogActions>
         </Dialog>
       )}
+
+      {/* --- AI QUIZ GENERATION DIALOG --- */}
+      <Dialog open={quizDialogOpen} onClose={closeQuizDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <AutoAwesomeIcon sx={{ color: '#7c3aed' }} />
+          Generate Quiz with AI
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Creating a skill assessment for: <strong>{quizJobTarget?.title}</strong>
+          </Typography>
+
+          {quizError && <Alert severity="error" sx={{ mb: 2 }}>{quizError}</Alert>}
+
+          <TextField
+            label="What topic should the quiz cover?"
+            placeholder="e.g. hand embroidery techniques, bamboo weaving, tailoring basics"
+            fullWidth
+            multiline
+            rows={2}
+            value={quizTopic}
+            onChange={(e) => setQuizTopic(e.target.value)}
+            disabled={quizGenerating}
+            autoFocus
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            AI will generate 5 multiple-choice questions on this topic, tailored to the job.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button onClick={closeQuizDialog} disabled={quizGenerating}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleGenerateQuiz}
+            disabled={quizGenerating}
+            startIcon={quizGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoAwesomeIcon />}
+            sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' } }}
+          >
+            {quizGenerating ? 'Generating...' : 'Generate Quiz'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
     </Container>
   );

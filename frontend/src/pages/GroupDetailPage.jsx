@@ -4,21 +4,25 @@ import {
   Button, Chip, Stack, Divider, Avatar, Snackbar
 } from '@mui/material';
 import { useParams, Link } from 'react-router-dom';
-import { api } from '../context/AuthContext.jsx';
+import { api, useAuth } from '../context/AuthContext.jsx';
 import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded';
 import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded';
 import PeopleRoundedIcon from '@mui/icons-material/PeopleRounded';
 import TopicRoundedIcon from '@mui/icons-material/TopicRounded';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
 
 function GroupDetailPage() {
   const { groupId } = useParams();
+  const { token, isEmployer } = useAuth();
+
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [joined, setJoined] = useState(false);
+  const [joinLoading, setJoinLoading] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   useEffect(() => {
     api.get(`/api/groups/${groupId}/`)
@@ -27,8 +31,23 @@ function GroupDetailPage() {
   }, [groupId]);
 
   const handleJoin = () => {
-    setJoined(true);
-    setSnackbarOpen(true);
+    setJoinLoading(true);
+    api.post(`/api/groups/${groupId}/join/`)
+      .then(({ data }) => {
+        setGroup(prev => ({
+          ...prev,
+          is_member: true,
+          member_count: data.member_count ?? prev.member_count,
+        }));
+        setSnackbarMessage(data.message || 'Successfully joined the group!');
+        setSnackbarOpen(true);
+      })
+      .catch((err) => {
+        const msg = err?.response?.data?.error || 'Failed to join group. Please try again.';
+        setSnackbarMessage(msg);
+        setSnackbarOpen(true);
+      })
+      .finally(() => setJoinLoading(false));
   };
 
   if (loading) return (
@@ -48,7 +67,6 @@ function GroupDetailPage() {
 
   return (
     <Box sx={{ bgcolor: '#f8fafc', minHeight: '100vh', pb: 8 }}>
-      {/* Header Banner */}
       <Box sx={{ bgcolor: '#0f172a', py: 6 }}>
         <Container maxWidth="md">
           <Button component={Link} to="/explore" startIcon={<ArrowBackIcon />} sx={{ color: '#94a3b8', mb: 3, textTransform: 'none' }}>
@@ -68,7 +86,6 @@ function GroupDetailPage() {
 
       <Container maxWidth="md" sx={{ mt: 4 }}>
         <Stack spacing={3}>
-          {/* Stats Row */}
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             {[
               { icon: <PeopleRoundedIcon />, label: 'Members', value: group.member_count, color: '#7c3aed' },
@@ -87,7 +104,6 @@ function GroupDetailPage() {
             ))}
           </Stack>
 
-          {/* Main Card */}
           <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
             <Typography variant="h6" fontWeight="700" gutterBottom>About This Group</Typography>
             <Typography color="text.secondary" sx={{ lineHeight: 1.8 }}>
@@ -97,19 +113,31 @@ function GroupDetailPage() {
 
             <Divider sx={{ my: 3 }} />
 
-            {joined ? (
+            {!token ? (
+              <Alert severity="info">
+                Please <Box component={Link} to="/login" sx={{ fontWeight: 700, color: 'inherit' }}>log in</Box> as a worker to join this group.
+              </Alert>
+            ) : isEmployer ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: '#f1f5f9', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                <BusinessRoundedIcon sx={{ color: '#64748b' }} />
+                <Typography color="text.secondary">
+                  Self-Help Groups are for workers only. Employer accounts can browse but cannot join.
+                </Typography>
+              </Box>
+            ) : group.is_member ? (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid #bbf7d0' }}>
                 <CheckCircleIcon color="success" />
-                <Typography color="success.main" fontWeight="600">You've joined this group! The group admin will contact you.</Typography>
+                <Typography color="success.main" fontWeight="600">You're a member of this group!</Typography>
               </Box>
             ) : (
               <Button
                 variant="contained"
                 size="large"
                 onClick={handleJoin}
+                disabled={joinLoading}
                 sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' }, textTransform: 'none', fontWeight: 700, borderRadius: 2, px: 4 }}
               >
-                Join This Group
+                {joinLoading ? 'Joining...' : 'Join This Group'}
               </Button>
             )}
           </Paper>
@@ -120,7 +148,7 @@ function GroupDetailPage() {
         open={snackbarOpen}
         autoHideDuration={4000}
         onClose={() => setSnackbarOpen(false)}
-        message="Successfully joined the group!"
+        message={snackbarMessage}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
     </Box>

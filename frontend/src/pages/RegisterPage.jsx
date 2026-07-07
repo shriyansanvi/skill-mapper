@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate, Link } from 'react-router-dom';
+import { api } from '../context/AuthContext.jsx';
 import {
   Button, TextField, Box, Typography, Alert, CircularProgress,
-  Paper, InputAdornment, IconButton, LinearProgress
+  Paper, InputAdornment, IconButton, LinearProgress,
+  ToggleButton, ToggleButtonGroup, Collapse
 } from '@mui/material';
 import WorkOutlineRoundedIcon from '@mui/icons-material/WorkOutlineRounded';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
+import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
 
 function getPasswordStrength(password) {
   let score = 0;
@@ -23,33 +26,57 @@ const strengthLabels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
 const strengthColors = ['', '#ef4444', '#f59e0b', '#3b82f6', '#22c55e'];
 
 function RegisterPage() {
+  const [role, setRole] = useState('artisan'); // 'artisan' | 'employer'
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const { register, loading } = useAuth();
   const navigate = useNavigate();
-
   const strength = getPasswordStrength(password);
+
+  const handleRoleChange = (event, newRole) => {
+    if (newRole !== null) {
+      setRole(newRole);
+      setError('');
+    }
+  };
 
   const handleRegister = async (e) => {
     e.preventDefault();
+
     if (!username.trim() || !password.trim()) {
-      setError('Please fill in all fields.');
+      setError('Please fill in all required fields.');
       return;
     }
+    if (role === 'employer' && !companyName.trim()) {
+      setError('Company name is required for employer accounts.');
+      return;
+    }
+
     setError('');
+    setLoading(true);
+
     try {
-      await register(username, password);
+      await api.post('/api/register/', {
+        username,
+        password,
+        role,
+        company_name: role === 'employer' ? companyName : '',
+      });
       setSuccess(true);
       setTimeout(() => navigate('/login'), 1500);
     } catch (err) {
       const data = err?.response?.data;
       if (data?.username) setError(data.username[0]);
       else if (data?.password) setError(data.password[0]);
+      else if (data?.company_name) setError(data.company_name[0]);
       else setError('Registration failed. Please check your inputs.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -62,6 +89,7 @@ function RegisterPage() {
         alignItems: 'center',
         justifyContent: 'center',
         px: 2,
+        py: 4,
       }}
     >
       <Paper
@@ -70,7 +98,7 @@ function RegisterPage() {
           p: { xs: 4, sm: 5 },
           borderRadius: 4,
           width: '100%',
-          maxWidth: 420,
+          maxWidth: 440,
           bgcolor: '#1e293b',
           border: '1px solid #334155',
         }}
@@ -86,8 +114,54 @@ function RegisterPage() {
           Create your account
         </Typography>
         <Typography variant="body2" color="#94a3b8" sx={{ mb: 3 }}>
-          Join thousands of artisans finding work
+          Choose how you want to use SkillMapper
         </Typography>
+
+        {/* --- Role Selector --- */}
+        <ToggleButtonGroup
+          value={role}
+          exclusive
+          onChange={handleRoleChange}
+          fullWidth
+          sx={{ mb: 3 }}
+        >
+          <ToggleButton
+            value="artisan"
+            sx={{
+              py: 1.5,
+              color: '#94a3b8',
+              borderColor: '#334155',
+              flexDirection: 'column',
+              gap: 0.5,
+              '&.Mui-selected': {
+                bgcolor: 'rgba(56,189,248,0.15)',
+                color: '#38bdf8',
+                borderColor: '#38bdf8',
+              },
+            }}
+          >
+            <PersonRoundedIcon fontSize="small" />
+            <Typography variant="caption" fontWeight="700">I'm a Worker</Typography>
+          </ToggleButton>
+          <ToggleButton
+            value="employer"
+            sx={{
+              py: 1.5,
+              color: '#94a3b8',
+              borderColor: '#334155',
+              flexDirection: 'column',
+              gap: 0.5,
+              '&.Mui-selected': {
+                bgcolor: 'rgba(56,189,248,0.15)',
+                color: '#38bdf8',
+                borderColor: '#38bdf8',
+              },
+            }}
+          >
+            <BusinessRoundedIcon fontSize="small" />
+            <Typography variant="caption" fontWeight="700">I'm Hiring</Typography>
+          </ToggleButton>
+        </ToggleButtonGroup>
 
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         {success && (
@@ -106,6 +180,19 @@ function RegisterPage() {
             autoComplete="username"
             sx={darkFieldStyle}
           />
+
+          {/* Company name only shows for employer role */}
+          <Collapse in={role === 'employer'}>
+            <TextField
+              label="Company Name"
+              fullWidth
+              margin="normal"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              sx={darkFieldStyle}
+            />
+          </Collapse>
+
           <TextField
             label="Password"
             type={showPassword ? 'text' : 'password'}
@@ -156,7 +243,7 @@ function RegisterPage() {
               '&:hover': { bgcolor: '#0ea5e9' },
             }}
           >
-            {loading ? <CircularProgress size={24} sx={{ color: '#0f172a' }} /> : 'Create Account'}
+            {loading ? <CircularProgress size={24} sx={{ color: '#0f172a' }} /> : `Create ${role === 'employer' ? 'Employer' : 'Worker'} Account`}
           </Button>
         </Box>
 
