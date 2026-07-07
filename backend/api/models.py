@@ -32,7 +32,7 @@ class Resume(models.Model):
     availability = models.CharField(max_length=50, choices=AVAILABILITY_CHOICES, default='Full-time')
     is_verified = models.BooleanField(default=False)
     skills = models.ManyToManyField(Skill, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.user.username}'s Resume"
@@ -85,8 +85,14 @@ class JobPosting(models.Model):
 class SelfHelpGroup(models.Model):
     name = models.CharField(max_length=200)
     topic = models.CharField(max_length=200)
-    member_count = models.IntegerField(default=0)
     location = models.CharField(max_length=200, blank=True)
+
+    # Real membership tracking — only workers should ever be added here.
+    # member_count below stays as a fast cached display number so we don't
+    # have to call members.count() on every list view; it's kept in sync
+    # by the join/leave endpoints.
+    members = models.ManyToManyField(User, blank=True, related_name='joined_groups')
+    member_count = models.IntegerField(default=0)
 
     def __str__(self):
         return self.name

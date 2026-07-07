@@ -3,28 +3,64 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import (
-    Skill, Resume, BusinessProfile, GovtProfile, JobPosting, 
-    SelfHelpGroup, PortfolioImage, Quiz, Question, Choice, 
+    Skill, Resume, BusinessProfile, GovtProfile, JobPosting,
+    SelfHelpGroup, PortfolioImage, Quiz, Question, Choice,
     QuizAttempt, JobApplication
 )
 
 # --- Authentication Serializers ---
 
 class UserSerializer(serializers.ModelSerializer):
+    """
+    Handles registration. Accepts an extra 'role' field (not a model field)
+    that determines whether to create a BusinessProfile alongside the User.
+    """
+    role = serializers.ChoiceField(
+        choices=['artisan', 'employer'],
+        write_only=True,
+        default='artisan'
+    )
+    company_name = serializers.CharField(
+        write_only=True, required=False, allow_blank=True
+    )
+
     class Meta:
         model = User
-        fields = ['username', 'password']
+        fields = ['username', 'password', 'role', 'company_name']
         extra_kwargs = {'password': {'write_only': True}}
 
     def validate_password(self, value):
         validate_password(value)
         return value
 
+    def validate(self, data):
+        # If registering as employer, company_name is required
+        if data.get('role') == 'employer' and not data.get('company_name', '').strip():
+            raise serializers.ValidationError(
+                {'company_name': 'Company name is required for employer accounts.'}
+            )
+        return data
+
     def create(self, validated_data):
+        role = validated_data.pop('role', 'artisan')
+        company_name = validated_data.pop('company_name', '')
+
         user = User.objects.create(username=validated_data['username'])
         user.set_password(validated_data['password'])
         user.save()
+
+        # Create the matching profile based on chosen role
+        if role == 'employer':
+            BusinessProfile.objects.create(
+                user=user,
+                company_name=company_name,
+                location=''  # Can be filled in later from profile settings
+            )
+        # 'artisan' role doesn't need a profile created immediately —
+        # Resume is created later via the ResumeForm
+
         return user
+
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -50,6 +86,7 @@ class ResumeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Resume
         fields = '__all__'
+        read_only_fields = ['user']  # Set automatically in perform_create — frontend shouldn't send this
 
 class BusinessProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -66,11 +103,20 @@ class JobPostingSerializer(serializers.ModelSerializer):
     class Meta:
         model = JobPosting
         fields = '__all__'
+        read_only_fields = ['posted_by']
 
 class SelfHelpGroupSerializer(serializers.ModelSerializer):
+    is_member = serializers.SerializerMethodField()
+
     class Meta:
         model = SelfHelpGroup
-        fields = '__all__'
+        fields = ['id', 'name', 'topic', 'location', 'member_count', 'is_member']
+
+    def get_is_member(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.members.filter(id=request.user.id).exists()
 
 class PortfolioImageSerializer(serializers.ModelSerializer):
     image = serializers.ImageField()
@@ -79,12 +125,12 @@ class PortfolioImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'resume', 'image', 'caption', 'uploaded_at']
         read_only_fields = ['resume']
 
-# --- QUIZ SERIALIZERS (Read - For taking the quiz) ---
+# --- QUIZ SERIALIZERS ---
 
 class ChoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Choice
-        fields = ['id', 'text'] # Hides 'is_correct'
+        fields = ['id', 'text']
 
 class QuestionSerializer(serializers.ModelSerializer):
     choices = ChoiceSerializer(many=True, read_only=True)
@@ -97,9 +143,6 @@ class QuizSerializer(serializers.ModelSerializer):
     class Meta:
         model = Quiz
         fields = ['id', 'title', 'description', 'job', 'questions', 'created_at']
-
-# --- QUIZ CREATION SERIALIZERS (Write - For Employers) ---
-# This is the part you were missing!
 
 class ChoiceCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -141,20 +184,17 @@ class JobApplicationSerializer(serializers.ModelSerializer):
     applicant_name = serializers.SerializerMethodField()
     applicant_bio = serializers.SerializerMethodField()
     applicant_email = serializers.SerializerMethodField()
-    applicant_phone = serializers.SerializerMethodField() # Ensure this exists
-    
-    # --- NEW FIELDS ---
+    applicant_phone = serializers.SerializerMethodField()
     applicant_location = serializers.SerializerMethodField()
     applicant_experience = serializers.SerializerMethodField()
     applicant_education = serializers.SerializerMethodField()
     applicant_skills = serializers.SerializerMethodField()
-    
     job_title = serializers.ReadOnlyField(source='job.title')
 
     class Meta:
         model = JobApplication
         fields = [
-            'id', 'job', 'job_title', 'applicant', 
+            'id', 'job', 'job_title', 'applicant',
             'applicant_name', 'applicant_bio', 'applicant_email', 'applicant_phone',
             'applicant_location', 'applicant_experience', 'applicant_education', 'applicant_skills',
             'quiz_score', 'applied_at', 'status'
@@ -169,11 +209,10 @@ class JobApplicationSerializer(serializers.ModelSerializer):
 
     def get_applicant_email(self, obj):
         return obj.applicant.resume.contact_email if hasattr(obj.applicant, 'resume') else "N/A"
-    
+
     def get_applicant_phone(self, obj):
         return obj.applicant.resume.contact_phone if hasattr(obj.applicant, 'resume') else "N/A"
 
-    # --- NEW METHODS ---
     def get_applicant_location(self, obj):
         return obj.applicant.resume.location if hasattr(obj.applicant, 'resume') else ""
 
@@ -187,12 +226,3 @@ class JobApplicationSerializer(serializers.ModelSerializer):
         if hasattr(obj.applicant, 'resume'):
             return SkillSerializer(obj.applicant.resume.skills.all(), many=True).data
         return []
-    
-class JobPostingSerializer(serializers.ModelSerializer):
-    required_skills = SkillSerializer(many=True, read_only=True)
-    
-    class Meta:
-        model = JobPosting
-        fields = '__all__'
-        # This tells Django: "Don't require 'posted_by' from the frontend. I will handle it."
-        read_only_fields = ['posted_by']
